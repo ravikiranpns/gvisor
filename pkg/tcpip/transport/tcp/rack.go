@@ -186,10 +186,16 @@ func (s *sender) schedulePTO() {
 
 // probeTimerExpired is the same as TLP_send_probe() as defined in
 // https://tools.ietf.org/html/draft-ietf-tcpm-rack-08#section-7.5.2.
-// +checklocks:s.ep.mu
-func (s *sender) probeTimerExpired() tcpip.Error {
+func (s *sender) probeTimerExpired() {
+	s.ep.mu.Lock()
+	defer s.ep.mu.Unlock()
+
+	if !s.probeTimer.enabled() {
+		return
+	}
+
 	if !s.probeTimer.checkExpiration() {
-		return nil
+		return
 	}
 
 	var dataSent bool
@@ -230,7 +236,7 @@ func (s *sender) probeTimerExpired() tcpip.Error {
 	// not the probe timer. This ensures that the sender does not send repeated,
 	// back-to-back tail loss probes.
 	s.postXmit(dataSent, false /* shouldScheduleProbe */)
-	return nil
+	return
 }
 
 // detectTLPRecovery detects if recovery was accomplished by the loss probes
@@ -385,17 +391,23 @@ func (rc *rackControl) detectLoss(rcvTime tcpip.MonotonicTime) int {
 
 // reorderTimerExpired will retransmit the segments which have not been acked
 // before the reorder timer expired.
-// +checklocks:rc.snd.ep.mu
-func (rc *rackControl) reorderTimerExpired() tcpip.Error {
+func (rc *rackControl) reorderTimerExpired() {
+	rc.snd.ep.mu.Lock()
+	defer rc.snd.ep.mu.Unlock()
+
+	if !rc.snd.reorderTimer.enabled() {
+		return
+	}
+
 	// Check if the timer actually expired or if it's a spurious wake due
 	// to a previously orphaned runtime timer.
 	if !rc.snd.reorderTimer.checkExpiration() {
-		return nil
+		return
 	}
 
 	numLost := rc.detectLoss(rc.snd.ep.stack.Clock().NowMonotonic())
 	if numLost == 0 {
-		return nil
+		return
 	}
 
 	fastRetransmit := false
@@ -406,7 +418,7 @@ func (rc *rackControl) reorderTimerExpired() tcpip.Error {
 	}
 
 	rc.DoRecovery(nil, fastRetransmit)
-	return nil
+	return
 }
 
 // DoRecovery implements lossRecovery.DoRecovery.
