@@ -70,6 +70,7 @@ TEST_OPTIONS += $(BASE_OPTIONS) \
   --keep_going \
   --verbose_failures=true \
   --build_event_json_file=.build_events.json
+NOGO_OPTIONS    := --//tools/nogo:full
 
 # Basic options.
 UID := $(shell id -u ${USER})
