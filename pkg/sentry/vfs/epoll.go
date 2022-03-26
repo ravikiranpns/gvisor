@@ -18,6 +18,7 @@ import (
 	"gvisor.dev/gvisor/pkg/abi/linux"
 	"gvisor.dev/gvisor/pkg/context"
 	"gvisor.dev/gvisor/pkg/errors/linuxerr"
+	"gvisor.dev/gvisor/pkg/log"
 	"gvisor.dev/gvisor/pkg/sync"
 	"gvisor.dev/gvisor/pkg/waiter"
 )
@@ -379,9 +380,11 @@ func (ep *EpollInstance) DeleteInterest(file *FileDescription, num int32) error 
 
 // NotifyEvent implements waiter.EventListener.NotifyEvent.
 func (epi *epollInterest) NotifyEvent(waiter.EventMask) {
+	log.Debugf("============= NotifyEvent %v", epi)
 	newReady := false
 	epi.epoll.readyMu.Lock()
 	if !epi.ready {
+		log.Debugf("============= NotifyEvent new %v", epi)
 		newReady = true
 		epi.ready = true
 		epi.epoll.ready.PushBack(epi)
@@ -398,6 +401,7 @@ func (ep *EpollInstance) removeLocked(epi *epollInterest) {
 	delete(ep.interest, epi.key)
 	ep.readyMu.Lock()
 	if epi.ready {
+		log.Debugf("============= remove %v", epi)
 		epi.ready = false
 		ep.ready.Remove(epi)
 	}
@@ -420,6 +424,7 @@ func (ep *EpollInstance) ReadEvents(events []linux.EpollEvent, maxEvents int) []
 		notReady epollInterestList
 		requeue  epollInterestList
 	)
+again:
 	ep.readyMu.Lock()
 	ready.PushBackList(&ep.ready)
 	ep.readySeq++
@@ -427,26 +432,6 @@ func (ep *EpollInstance) ReadEvents(events []linux.EpollEvent, maxEvents int) []
 	if ready.Empty() {
 		return nil
 	}
-	defer func() {
-		ep.readyMu.Lock()
-		// epollInterests that we never checked are re-inserted at the start of
-		// ep.ready. epollInterests that were ready are re-inserted at the end
-		// for reasons described by EpollInstance.ready.
-		ep.ready.PushFrontList(&ready)
-		var next *epollInterest
-		for epi := notReady.Front(); epi != nil; epi = next {
-			next = epi.Next()
-			if epi.readySeq == ep.readySeq {
-				// epi.NotifyEvent() was called while we were running.
-				notReady.Remove(epi)
-				ep.ready.PushBack(epi)
-			} else {
-				epi.ready = false
-			}
-		}
-		ep.ready.PushBackList(&requeue)
-		ep.readyMu.Unlock()
-	}()
 
 	i := 0
 	var next *epollInterest
@@ -471,6 +456,7 @@ func (ep *EpollInstance) ReadEvents(events []linux.EpollEvent, maxEvents int) []
 			fallthrough
 		case epi.mask&linux.EPOLLET != 0:
 			// Leave epi off the ready list.
+			log.Debugf("============= Remove %v", epi)
 			notReady.PushBack(epi)
 		default:
 			// Queue epi to be moved to the end of the ready list.
@@ -486,5 +472,34 @@ func (ep *EpollInstance) ReadEvents(events []linux.EpollEvent, maxEvents int) []
 			break
 		}
 	}
+
+	retry := false
+	ep.readyMu.Lock()
+	// epollInterests that we never checked are re-inserted at the start of
+	// ep.ready. epollInterests that were ready are re-inserted at the end
+	// for reasons described by EpollInstance.ready.
+	ep.ready.PushFrontList(&ready)
+	next = nil
+	for epi := notReady.Front(); epi != nil; epi = next {
+		next = epi.Next()
+		if epi.readySeq == ep.readySeq {
+			log.Debugf("============= Add %v", epi)
+			// epi.NotifyEvent() was called while we were running.
+			notReady.Remove(epi)
+			ep.ready.PushBack(epi)
+			retry = true
+		} else {
+			epi.ready = false
+		}
+	}
+	ep.ready.PushBackList(&requeue)
+	log.Debugf("============= ReadEvents len(ep.ready) %v", ep.ready)
+	ep.readyMu.Unlock()
+
+	if retry {
+		goto again
+	}
+
+	log.Debugf("============= ReadEvents len(events) %d (%+v)", len(events), events)
 	return events
 }
