@@ -27,6 +27,11 @@ const (
 
 	// CtxRoot is a Context.Value key for a VFS root.
 	CtxRoot
+
+	// CtxRestoreFilesystemFDMap is a Context.Value key for a map[string]int
+	// mapping filesystem unique IDs (cf. gofer.InternalFilesystemOptions.UniqueID)
+	// to host FDs.
+	CtxRestoreFilesystemFDMap
 )
 
 // MountNamespaceFromContext returns the MountNamespace used by ctx. If ctx is
@@ -46,7 +51,7 @@ type mountNamespaceContext struct {
 }
 
 // Value implements Context.Value.
-func (mc mountNamespaceContext) Value(key interface{}) interface{} {
+func (mc mountNamespaceContext) Value(key any) any {
 	switch key {
 	case CtxMountNamespace:
 		mc.mntns.IncRef()
@@ -88,7 +93,7 @@ func WithRoot(ctx context.Context, root VirtualDentry) context.Context {
 }
 
 // Value implements Context.Value.
-func (rc rootContext) Value(key interface{}) interface{} {
+func (rc rootContext) Value(key any) any {
 	switch key {
 	case CtxRoot:
 		rc.root.IncRef()

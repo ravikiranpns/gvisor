@@ -15,19 +15,19 @@ import (
 //
 // Compared to sync/atomic.Value:
 //
-// - Mutation of SeqCount-protected data does not require memory allocation,
-// whereas atomic.Value generally does. This is a significant advantage when
-// writes are common.
+//   - Mutation of SeqCount-protected data does not require memory allocation,
+//     whereas atomic.Value generally does. This is a significant advantage when
+//     writes are common.
 //
-// - Atomic reads of SeqCount-protected data require copying. This is a
-// disadvantage when atomic reads are common.
+//   - Atomic reads of SeqCount-protected data require copying. This is a
+//     disadvantage when atomic reads are common.
 //
-// - SeqCount may be more flexible: correct use of SeqCount.ReadOk allows other
-// operations to be made atomic with reads of SeqCount-protected data.
+//   - SeqCount may be more flexible: correct use of SeqCount.ReadOk allows other
+//     operations to be made atomic with reads of SeqCount-protected data.
 //
-// - SeqCount is more cumbersome to use; atomic reads of SeqCount-protected
-// data require instantiating function templates using go_generics (see
-// seqatomic.go).
+//   - SeqCount is more cumbersome to use; atomic reads of SeqCount-protected
+//     data require instantiating function templates using go_generics (see
+//     seqatomic.go).
 type SeqCount struct {
 	// epoch is incremented by BeginWrite and EndWrite, such that epoch is odd
 	// if a writer critical section is active, and a read from data protected
@@ -39,36 +39,19 @@ type SeqCount struct {
 // SeqCountEpoch tracks writer critical sections in a SeqCount.
 type SeqCountEpoch uint32
 
-// We assume that:
-//
-// - All functions in sync/atomic that perform a memory read are at least a
-// read fence: memory reads before calls to such functions cannot be reordered
-// after the call, and memory reads after calls to such functions cannot be
-// reordered before the call, even if those reads do not use sync/atomic.
-//
-// - All functions in sync/atomic that perform a memory write are at least a
-// write fence: memory writes before calls to such functions cannot be
-// reordered after the call, and memory writes after calls to such functions
-// cannot be reordered before the call, even if those writes do not use
-// sync/atomic.
-//
-// As of this writing, the Go memory model completely fails to describe
-// sync/atomic, but these properties are implied by
-// https://groups.google.com/forum/#!topic/golang-nuts/7EnEhM3U7B8.
-
 // BeginRead indicates the beginning of a reader critical section. Reader
 // critical sections DO NOT BLOCK writer critical sections, so operations in a
 // reader critical section MAY RACE with writer critical sections. Races are
 // detected by ReadOk at the end of the reader critical section. Thus, the
 // low-level structure of readers is generally:
 //
-//     for {
-//         epoch := seq.BeginRead()
-//         // do something idempotent with seq-protected data
-//         if seq.ReadOk(epoch) {
-//             break
-//         }
-//     }
+//	for {
+//	    epoch := seq.BeginRead()
+//	    // do something idempotent with seq-protected data
+//	    if seq.ReadOk(epoch) {
+//	        break
+//	    }
+//	}
 //
 // However, since reader critical sections may race with writer critical
 // sections, the Go race detector will (accurately) flag data races in readers
@@ -104,6 +87,7 @@ func (s *SeqCount) beginReadSlow() SeqCountEpoch {
 // Reader critical sections do not need to be explicitly terminated; the last
 // call to ReadOk is implicitly the end of the reader critical section.
 func (s *SeqCount) ReadOk(epoch SeqCountEpoch) bool {
+	MemoryFenceReads()
 	return atomic.LoadUint32(&s.epoch) == uint32(epoch)
 }
 

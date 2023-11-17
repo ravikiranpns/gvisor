@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Package watchdog is responsible for monitoring the sentry for tasks that may
-// potentially be stuck or looping inderterminally causing hard to debug hungs in
+// potentially be stuck or looping inderterminally causing hard to debug hangs in
 // the untrusted app.
 //
 // It works by periodically querying all tasks to check whether they are in user
@@ -22,11 +22,10 @@
 // without blocking are considered stuck and are reported.
 //
 // When a stuck task is detected, the watchdog can take one of the following actions:
-//		1. LogWarning: Logs a warning message followed by a stack dump of all goroutines.
-//			 If a tasks continues to be stuck, the message will repeat every minute, unless
-//			 a new stuck task is detected
-//		2. Panic: same as above, followed by panic()
-//
+//  1. LogWarning: Logs a warning message followed by a stack dump of all goroutines.
+//     If a tasks continues to be stuck, the message will repeat every minute, unless
+//     a new stuck task is detected
+//  2. Panic: same as above, followed by panic()
 package watchdog
 
 import (
@@ -105,7 +104,7 @@ func (a *Action) Set(v string) error {
 }
 
 // Get implements flag.Value.
-func (a *Action) Get() interface{} {
+func (a *Action) Get() any {
 	return *a
 }
 
@@ -181,7 +180,7 @@ func New(k *kernel.Kernel, opts Opts) *Watchdog {
 	// Handle StartupTimeout if it exists.
 	if w.StartupTimeout > 0 {
 		log.Infof("Watchdog waiting %v for startup", w.StartupTimeout)
-		go w.waitForStart() // S/R-SAFE: watchdog is stopped buring save and restarted after restore.
+		go w.waitForStart() // S/R-SAFE: watchdog is stopped during save and restarted after restore.
 	}
 
 	return w
@@ -237,7 +236,7 @@ func (w *Watchdog) waitForStart() {
 		return
 	}
 
-	metric.WeirdnessMetric.Increment("watchdog_stuck_startup")
+	metric.WeirdnessMetric.Increment(&metric.WeirdnessTypeWatchdogStuckStartup)
 
 	var buf bytes.Buffer
 	buf.WriteString(fmt.Sprintf("Watchdog.Start() not called within %s", w.StartupTimeout))
@@ -310,7 +309,7 @@ func (w *Watchdog) runTurn() {
 					// unless they are surrounded by
 					// Task.UninterruptibleSleepStart/Finish.
 					tc = &offender{lastUpdateTime: lastUpdateTime}
-					metric.WeirdnessMetric.Increment("watchdog_stuck_tasks")
+					metric.WeirdnessMetric.Increment(&metric.WeirdnessTypeWatchdogStuckTasks)
 					newTaskFound = true
 				}
 				newOffenders[t] = tc

@@ -31,7 +31,7 @@ type objectEncodeState struct {
 
 	// obj is the object value. Note that this may be replaced if we
 	// encounter an object that contains this object. When this happens (in
-	// resolve), we will update existing references approprately, below,
+	// resolve), we will update existing references appropriately, below,
 	// and defer a re-encoding of the object.
 	obj reflect.Value
 
@@ -112,13 +112,13 @@ type encodeState struct {
 //
 // isSameSizeParent deals with objects like this:
 //
-// struct child {
-//     // fields..
-// }
+//	struct child {
+//		// fields..
+//	}
 //
-// struct parent {
-//     c child
-// }
+//	struct parent {
+//		c child
+//	}
 //
 // var p parent
 // record(&p.c)
@@ -127,9 +127,9 @@ type encodeState struct {
 //
 // Or like this:
 //
-// struct child {
-//     // fields
-// }
+//	struct child {
+//		// fields
+//	}
 //
 // var arr [1]parent
 // record(&arr[0])
@@ -417,7 +417,7 @@ func traverse(rootType, targetType reflect.Type, rootAddr, targetAddr uintptr) [
 		Failf("no field in root type %v contains target type %v", rootType, targetType)
 
 	case reflect.Array:
-		// Since arrays have homogenous types, all elements have the
+		// Since arrays have homogeneous types, all elements have the
 		// same size and we can compute where the target lives. This
 		// does not matter for the purpose of typing, but matters for
 		// the purpose of computing the address of the given index.
@@ -432,7 +432,7 @@ func traverse(rootType, targetType reflect.Type, rootAddr, targetAddr uintptr) [
 
 	default:
 		// For any other type, there's no possibility of aliasing so if
-		// the types didn't match earlier then we have an addresss
+		// the types didn't match earlier then we have an address
 		// collision which shouldn't be possible at this point.
 		Failf("traverse failed for root type %v and target type %v", rootType, targetType)
 	}
@@ -838,11 +838,6 @@ func WriteHeader(w wire.Writer, length uint64, object bool) error {
 		wire.SaveUint(w, length)
 	})
 }
-
-// deferredMapper is for the deferred list.
-type deferredMapper struct{}
-
-func (deferredMapper) linkerFor(oes *objectEncodeState) *deferredEntry { return &oes.deferredEntry }
 
 // addrSetFunctions is used by addrSet.
 type addrSetFunctions struct{}

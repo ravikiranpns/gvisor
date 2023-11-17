@@ -359,6 +359,9 @@ func (t *Task) SetExtraGIDs(gids []auth.GID) error {
 	return nil
 }
 
+// weakCaps is a set of capabilities that can be disabled externally.
+var weakCaps = auth.CapabilitySetOf(linux.CAP_NET_RAW)
+
 // SetCapabilitySets attempts to change t's permitted, inheritable, and
 // effective capability sets.
 func (t *Task) SetCapabilitySets(permitted, inheritable, effective auth.CapabilitySet) error {
@@ -370,6 +373,13 @@ func (t *Task) SetCapabilitySets(permitted, inheritable, effective auth.Capabili
 		return linuxerr.EPERM
 	}
 	creds := t.Credentials()
+
+	// Don't fail if one or more weak capabilities can't be set, just drop them.
+	mask := (weakCaps & creds.BoundingCaps) | (auth.AllCapabilities &^ weakCaps)
+	permitted &= mask
+	inheritable &= mask
+	effective &= mask
+
 	// "It is also a limiting superset for the capabilities that may be added
 	// to the inheritable set by a thread that does not have the CAP_SETPCAP
 	// capability in its effective set."
@@ -461,20 +471,20 @@ func (t *Task) SetKeepCaps(k bool) {
 // (set-user/group-ID bits and file capabilities). This allows us to make a lot
 // of simplifying assumptions:
 //
-// - We assume the no_new_privs bit (set by prctl(SET_NO_NEW_PRIVS)), which
-// disables the features we don't support anyway, is always set. This
-// drastically simplifies this function.
+//   - We assume the no_new_privs bit (set by prctl(SET_NO_NEW_PRIVS)), which
+//     disables the features we don't support anyway, is always set. This
+//     drastically simplifies this function.
 //
-// - We don't set AT_SECURE = 1, because no_new_privs always being set means
-// that the conditions that require AT_SECURE = 1 never arise. (Compare Linux's
-// security/commoncap.c:cap_bprm_set_creds() and cap_bprm_secureexec().)
+//   - We don't set AT_SECURE = 1, because no_new_privs always being set means
+//     that the conditions that require AT_SECURE = 1 never arise. (Compare Linux's
+//     security/commoncap.c:cap_bprm_set_creds() and cap_bprm_secureexec().)
 //
-// - We don't check for CAP_SYS_ADMIN in prctl(PR_SET_SECCOMP), since
-// seccomp-bpf is also allowed if the task has no_new_privs set.
+//   - We don't check for CAP_SYS_ADMIN in prctl(PR_SET_SECCOMP), since
+//     seccomp-bpf is also allowed if the task has no_new_privs set.
 //
-// - Task.ptraceAttach does not serialize with execve as it does in Linux,
-// since no_new_privs being set has the same effect as the presence of an
-// unprivileged tracer.
+//   - Task.ptraceAttach does not serialize with execve as it does in Linux,
+//     since no_new_privs being set has the same effect as the presence of an
+//     unprivileged tracer.
 //
 // Preconditions: t.mu must be locked.
 func (t *Task) updateCredsForExecLocked() {

@@ -24,28 +24,37 @@ import (
 // archSyscallFilters returns arch-specific syscalls made exclusively by the
 // KVM platform.
 func (k *KVM) archSyscallFilters() seccomp.SyscallRules {
-	return seccomp.SyscallRules{
-		unix.SYS_ARCH_PRCTL: {
-			{
+	return seccomp.MakeSyscallRules(map[uintptr]seccomp.SyscallRule{
+		unix.SYS_ARCH_PRCTL: seccomp.Or{
+			seccomp.PerArg{
 				seccomp.EqualTo(linux.ARCH_GET_FS),
 			},
-			{
+			seccomp.PerArg{
 				seccomp.EqualTo(linux.ARCH_GET_GS),
 			},
 		},
-		unix.SYS_IOCTL: []seccomp.Rule{
-			{
-				seccomp.MatchAny{},
-				seccomp.EqualTo(_KVM_INTERRUPT),
+		unix.SYS_IOCTL: seccomp.Or{
+			seccomp.PerArg{
+				seccomp.NonNegativeFD{},
+				seccomp.EqualTo(KVM_INTERRUPT),
 			},
-			{
-				seccomp.MatchAny{},
-				seccomp.EqualTo(_KVM_NMI),
+			seccomp.PerArg{
+				seccomp.NonNegativeFD{},
+				seccomp.EqualTo(KVM_NMI),
 			},
-			{
-				seccomp.MatchAny{},
-				seccomp.EqualTo(_KVM_GET_REGS),
+			seccomp.PerArg{
+				seccomp.NonNegativeFD{},
+				seccomp.EqualTo(KVM_GET_REGS),
 			},
 		},
+	})
+}
+
+// HottestSyscalls implements Platform.HottestSyscalls.
+func (*KVM) HottestSyscalls() []uintptr {
+	return []uintptr{
+		unix.SYS_FUTEX,
+		unix.SYS_IOCTL,
+		unix.SYS_RT_SIGRETURN,
 	}
 }

@@ -61,7 +61,7 @@ type response struct {
 }
 
 var responsePool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		return &response{
 			done: make(chan error, 1),
 		}
@@ -103,7 +103,7 @@ type Client struct {
 	// efficient, and does not require tags).
 	sendRecv func(message, message) error
 
-	// -- below corresponds to sendRecvChannel --
+	//	-- below corresponds to sendRecvChannel --
 
 	// channelsMu protects channels.
 	channelsMu sync.Mutex
@@ -118,7 +118,7 @@ type Client struct {
 	// availableChannels is a LIFO of inactive channels.
 	availableChannels []*channel
 
-	// -- below corresponds to sendRecvLegacy --
+	//	-- below corresponds to sendRecvLegacy --
 
 	// pending is the set of pending messages.
 	pending   map[Tag]*response
@@ -406,7 +406,7 @@ func (c *Client) handleOne() {
 	}
 }
 
-// waitAndRecv co-ordinates with other receivers to handle responses.
+// waitAndRecv coordinates with other receivers to handle responses.
 func (c *Client) waitAndRecv(done chan error) error {
 	for {
 		select {
@@ -474,7 +474,7 @@ func (c *Client) sendRecvLegacy(t message, r message) (bool, error) {
 		return false, err
 	}
 
-	// Co-ordinate with other receivers.
+	// Coordinate with other receivers.
 	if err := c.waitAndRecv(resp.done); err != nil {
 		return false, err
 	}

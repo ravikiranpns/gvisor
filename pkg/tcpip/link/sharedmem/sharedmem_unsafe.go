@@ -20,13 +20,14 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/unix"
+	"gvisor.dev/gvisor/pkg/atomicbitops"
 	"gvisor.dev/gvisor/pkg/memutil"
 )
 
 // sharedDataPointer converts the shared data slice into a pointer so that it
 // can be used in atomic operations.
-func sharedDataPointer(sharedData []byte) *uint32 {
-	return (*uint32)(unsafe.Pointer(&sharedData[0:4][0]))
+func sharedDataPointer(sharedData []byte) *atomicbitops.Uint32 {
+	return (*atomicbitops.Uint32)(unsafe.Pointer(&sharedData[0:4][0]))
 }
 
 // getBuffer returns a memory region mapped to the full contents of the given
@@ -47,7 +48,7 @@ func getBuffer(fd int) ([]byte, error) {
 		return nil, fmt.Errorf("failed to map memory for buffer fd: %d, error: %s", fd, err)
 	}
 
-	// Use unsafe to conver addr into a []byte.
+	// Use unsafe to convert addr into a []byte.
 	var b []byte
 	hdr := (*reflect.SliceHeader)(unsafe.Pointer(&b))
 	hdr.Data = addr
